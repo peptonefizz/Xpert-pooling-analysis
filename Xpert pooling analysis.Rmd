@@ -8,12 +8,9 @@ date: "`r Sys.Date()`"
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(echo=F,message=F, warning=F)
 suppressMessages(if (!require("pacman")) install.packages("pacman"))
-pacman::p_load(tidyverse,rio,janitor,here,rbibutils,binGroup2,sessioninfo)
+pacman::p_load(tidyverse,rio,writexl,janitor,here,rbibutils,binGroup2,sessioninfo)
 ```
 
-```{r session info}
-# sessioninfo::session_info(pkgs = c("loaded", "attached")[1], to_file = here("Session info","session_info.txt"))
-```
 
 ```{r import, include=F}
 data <- import(here("Data","Xpert_pooling_data.xlsx"), which = "data")
@@ -23,22 +20,118 @@ legend <- import(here("Data","Xpert_pooling_data.xlsx"), which = "legend") %>% c
 master <- bind_cols(data,combination %>% select(-c(1:3))) %>% clean_names()
 ```
 
-```{r binGroup2, include=F}
+
+```{r input tables, include=F}
+# putting together input tables for the paper
+
+########### Table: testing data ###########
+tableinput_data <- master %>%
+  distinct(identifier, country, platform, cut_off_score, .keep_all = TRUE) %>%
+  mutate(country_platform = paste(country, platform, sep = "-")) %>%
+  select( country_platform, cut_off_score, tests_performed, test_positive)
+
+tableinput_data_wide <- function(dataframe, platform_name) {
+  platform_filtered <- dataframe %>%
+    filter(str_detect(country_platform, platform_name))
+  
+  platform_wide_tests <- platform_filtered %>%
+    pivot_wider(
+      names_from = country_platform,
+      values_from = c(tests_performed, test_positive),
+      names_glue = "{.value}: {country_platform}"
+    ) %>% 
+    rename_with(~str_replace(., "test_positive:", "Positive tests:"), starts_with("test_positive:")) %>%
+    rename_with(~str_replace(., "tests_performed:", "Tests performed:"), starts_with("tests_performed:")) %>%
+    rename(`Cut-off score` = cut_off_score)
+  
+  return(platform_wide_tests)
+}
+
+tableinput_data_qxr <- tableinput_data_wide(tableinput_data, "qXR") %>% 
+  # add or change columns
+  select(`Cut-off score`,
+         `Tests performed: Bangladesh-qXRv3`, `Positive tests: Bangladesh-qXRv3`,
+         `Tests performed: Nigeria-qXRv3`,    `Positive tests: Nigeria-qXRv3`,
+         `Tests performed: VietNam-qXRv3`,    `Positive tests: VietNam-qXRv3`
+  )
+tableinput_data_cad4tb <- tableinput_data_wide(tableinput_data, "CAD4TB")
+
+
+########### Table: testing threshold data ###########
+tableinput_threshold <- master %>%
+  distinct(identifier, country, platform, cut_off_score, .keep_all = TRUE) %>%
+  mutate(country_platform = paste(country, platform, sep = "-"),
+         testing_threshold = ifelse(general_pooling_case == 0, "No testing", "Testing")) %>%
+  select(identifier, country_platform, cut_off_score, testing_threshold)
+
+tableinput_threshold_wide <- function(dataframe, platform_name) {
+  platform_filtered <- dataframe %>%
+    filter(str_detect(country_platform, platform_name))
+  
+  platform_wide <- platform_filtered %>%
+    pivot_wider(
+      id_cols = cut_off_score,
+      names_from = country_platform,
+      values_from = testing_threshold,
+      names_glue = "Testing threshold: {country_platform}"
+    ) %>%
+    rename(!!paste0(platform_name, " score") := cut_off_score)
+  
+  return(platform_wide)
+}
+
+tableinput_threshold_qxr <- tableinput_threshold_wide(tableinput_threshold, "qXR")
+tableinput_threshold_cad4tb <- tableinput_threshold_wide(tableinput_threshold, "CAD4TB")
+
+
+########### Table: combination ###########
+tableinput_combination <- master %>% 
+  select(-c(tests_performed, test_positive)) %>% 
+  rename(
+    `Identifier` = identifier,
+    `Country` = country,
+    `Platform` = platform,
+    `Cut-off Score` = cut_off_score,
+    `CXR Case` = cxr_case,
+    `General Pooling Case` = general_pooling_case,
+    `Mixed Pooling Case` = mixed_pooling_case,
+    `CAD Cohort Pooling Case` = cad_cohort_pooling_case
+  ) %>% 
+  mutate(across(`CXR Case`:`CAD Cohort Pooling Case`, ~case_when(
+    . == 0  ~ "No",
+    . == 1  ~ "Individual",
+    . == 11 ~ "Pool 1",
+    . == 22 ~ "Pool 2",
+    . == 33 ~ "Pool 3",
+    TRUE    ~ as.character(.)
+  ))) %>% 
+  select(-c(Identifier, combination_4))
+
+# exporting the tables
+export(list(qXR_data = tableinput_data_qxr, CAD4TB_data = tableinput_data_cad4tb,
+            qXR_threshold = tableinput_threshold_qxr, CAD4TB_threshold = tableinput_threshold_cad4tb,
+            combination = tableinput_combination),
+       here("Output", "Xpert_pooling_input_tables.xlsx"))
+```
+
+
+```{r setting up binGroup2, include=F}
 # matrix for specifying pool size in non-informative hierarchical testing in binGroup2
-pool3 <- matrix(data = c(rep(1, 3), 1:3), nrow = 2, ncol = 3, byrow = TRUE)
-pool4 <- matrix(data = c(rep(1, 4), 1:4), nrow = 2, ncol = 4, byrow = TRUE)
+pool3 <- matrix(data = c(rep(1, 3), 1:3), nrow = 2, ncol = 3, byrow = TRUE) # pools of 3
+pool4 <- matrix(data = c(rep(1, 4), 1:4), nrow = 2, ncol = 4, byrow = TRUE) # pools of 4
 
 # function for calculating expected tests per individual
-calculateExpTests <- function(p, pooln, Se, Sp) {
+calculateExpTests <- function(p, pooln, SeP, SeI, SpP, SpI) {
   pool_matrix <- get(pooln, envir = .GlobalEnv)
-  output <- binGroup2::opChar1(algorithm = "D2", p = p, Se = Se, Sp = Sp, hier.config = pool_matrix, print.time = FALSE)
+  output <- binGroup2::opChar1(algorithm = "D2", p = p, Se = c(SeP, SeI), Sp = c(SpP, SpI), hier.config = pool_matrix, print.time = FALSE)
   return(ExpTests(output)$ExpTestsPerIndividual)
 }
 ```
 
-```{r main function, include=F}
+
+```{r main function for summary table, include=F}
 # Define the main summarization function
-summarizeAndCalculate <- function(df, poolsize, combination, Se, Sp) {
+summarizeAndCalculate <- function(df, poolsize, combination, SeP, SeI, SpP, SpI) {
   comb_col <- rlang::sym(combination)
   summary_df <- df %>% 
     group_by(!!comb_col) %>% 
@@ -54,7 +147,7 @@ summarizeAndCalculate <- function(df, poolsize, combination, Se, Sp) {
       total_tests = case_when(
         !!comb_col == 0 ~ 0,
         !!comb_col == 1 ~ tests_performed,
-        TRUE ~ ceiling(as.numeric(calculateExpTests(positivity, poolsize, Se, Sp)) * tests_performed)
+        TRUE ~ ceiling(as.numeric(calculateExpTests(positivity, poolsize, SeP, SeI, SpP, SpI)) * tests_performed)
       )
     ) %>% ungroup() %>%
     summarise(
@@ -65,42 +158,118 @@ summarizeAndCalculate <- function(df, poolsize, combination, Se, Sp) {
 }
 # Usage example
 # Modify to comb_col <- rlang::ensym(combination)
-# test <- summarizeAndCalculate(df, pool4, comb4)
+# test <- summarizeAndCalculate(master, pool4, combination_4, 1, 1, 1, 1)
 ```
 
-```{r analysis}
-# Defining values of sensitivity, specificity, pool size, combination and dataset identifiers
-Se_values <- c(0.95, 0.99, 1) 
-Sp_values <- c(0.95, 0.99, 1)
+
+```{r analysis, include=F}
+# conducting the main analysis with different values of variable listed next. This becomes the basis of pulling together summary tables and sensitivity analysis tables.
+# defining values of sensitivity, specificity, pool size, combination and dataset identifiers
+SeP_values <- c(0.98, 1) 
+SeI_values <- c(1) 
+SpP_values <- c(0.95, 1)
+SpI_values <- c(1)
 poolsize_values <- c("pool3", "pool4") 
 combination_values <- colnames(combination %>% clean_names() %>% select(-c(1:3)))
 identifier_values <- unique(master$identifier)
 
-# Function to process a single combination
-process_combination <- function(identifier, poolsize, combination, Se, Sp) {
+# function to process a single combination
+process_combination <- function(identifier, poolsize, combination, SeP, SeI, SpP, SpI) {
   df_subset <- master %>% filter(identifier == !!identifier)
   combination <- as.character(combination)
   
-  result <- summarizeAndCalculate(df_subset, poolsize, combination, Se, Sp)
-  result <- cbind(identifier = identifier, poolsize = poolsize, combination = combination, Se = Se, Sp = Sp, result)
+  result <- summarizeAndCalculate(df_subset, poolsize, combination, SeP, SeI, SpP, SpI)
+  sensitivity_case <- paste("SeP", SeP, "SpP", SpP, sep = "_") #add SeI and SpI if varying those
+  result <- cbind(identifier = identifier, poolsize = poolsize, combination = combination, SeP = SeP, SeI = SeI, 
+                  SpP = SpP, SpI = SpI, sensitivity_case = sensitivity_case, result)
   return(result)
 }
 
-# Generate all combinations
+# generate all combinations
 results <- expand.grid(identifier = identifier_values, poolsize = poolsize_values, 
-                       combination = combination_values, Se = Se_values, Sp = Sp_values, 
-                       stringsAsFactors = FALSE)
+                       combination = combination_values, SeP = SeP_values, SeI = SeI_values, SpP = SpP_values,
+                       SpI = SpI_values, stringsAsFactors = FALSE)
 
-# Apply the function to all combinations
+# apply the function to all combinations
 output <- pmap(results, process_combination) %>% bind_rows()
 
 output_summary <- left_join(output, legend, by="identifier")
-
 output_summary %>% export(here("Output","Xpert_pooling_output.xlsx"))
 ```
 
 
-```{r}
-# tabulate or show visually
+```{r summary output table, include=F}
+# calculate the 'Base case'
+base_case <- aggregate(tests_performed ~ identifier, data = master, FUN = sum)
+
+# template data frame for the results
+results_template <- data.frame(
+  Use_Case = c("Base case", "CXR case", "General pooling case", "Mixed pooling case", "CAD cohort pooling case"),
+  Total_Tests_Done = NA,
+  Tests_saved_from_prior_case = NA,
+  Percentage_test_saved_from_prior_case = NA
+)
+results_by_identifier <- list()
+
+# loop through each unique identifier
+for (id in unique(output_summary$identifier)) {
+  summary_subset <- output_summary[output_summary$identifier == id & output_summary$sensitivity_case == "SeP_1_SpP_1" & output_summary$poolsize == "pool4", ]
+  results <- results_template
+  results$Total_Tests_Done[results$Use_Case == "Base case"] <- base_case$tests_performed[base_case$identifier == id]
+  results$Total_Tests_Done[-1] <- summary_subset$total_tests
+  
+  for (i in 2:nrow(results)) {
+    results$Tests_saved_from_prior_case[i] <- results$Total_Tests_Done[i-1] - results$Total_Tests_Done[i]
+    results$Percentage_test_saved_from_prior_case[i] <- (results$Tests_saved_from_prior_case[i] / results$Total_Tests_Done[i-1])
+  }
+  
+  results_by_identifier[[id]] <- results
+}
+results_by_identifier$legend <- legend
+export(results_by_identifier, here("Output", "Xpert_pooling_overall_summary.xlsx"))
 ```
 
+
+```{r sensitivity analysis tables, include=F}
+# putting together sensitivity analysis tables for the paper
+sensitivity_summary <- output_summary %>%
+  mutate(SpP_value = paste("Pooling specificity:", SpP)) %>%
+  pivot_wider(id_cols = c(identifier, country, platform, poolsize, combination, SeP),
+              names_from = SpP_value,
+              values_from = total_tests,
+              names_prefix = "") %>% 
+  filter(combination != "combination_4") %>% 
+  mutate(combination = case_when(combination == "cxr_case"                ~ "CXR Case",
+                                 combination == "general_pooling_case"    ~ "General Pooling Case",
+                                 combination == "mixed_pooling_case"      ~ "Mixed Pooling Case",
+                                 combination == "cad_cohort_pooling_case" ~ "CAD Cohort Pooling Case")
+  ) %>% 
+  mutate(poolsize = case_when(poolsize == "pool3" ~ "Pools of 3",
+                              poolsize == "pool4" ~ "Pools of 4")
+  ) %>% 
+  rename(`Identifier` = identifier,
+         `Country` = country,
+         `Platform` = platform,
+         `Pool size` = poolsize,
+         `Pooling case` = combination,
+         `Pooling sensitivity` = SeP) 
+
+sensitivity_unique_identifiers <- unique(sensitivity_summary$Identifier)
+
+sensitivity_dfs <- list()
+
+# loop over each identifier and create a separate data frame
+for (id in sensitivity_unique_identifiers) {
+  df <- sensitivity_summary %>%
+    filter(Identifier == id) %>%
+    arrange(`Pool size`)
+    sensitivity_dfs[[id]] <- df
+}
+
+write_xlsx(sensitivity_dfs, here("Output", "Xpert_pooling_sensitivity_summary.xlsx"))
+```
+
+
+```{r session info}
+sessioninfo::session_info(pkgs = c("loaded", "attached")[1], to_file = here("Session info","Xpert_pooling_analysis_session_info.txt"))
+```

@@ -22,6 +22,7 @@ Archive
 **/*.xlsx
 
 # session info
-!Session\ info/*.txt
+Session\ info/*.txt
 
+Xpert pooling analysis_text.Rmd
 .Rproj.user
