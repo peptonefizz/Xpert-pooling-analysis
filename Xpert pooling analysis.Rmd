@@ -165,9 +165,9 @@ summarizeAndCalculate <- function(df, poolsize, combination, SeP, SeI, SpP, SpI)
 ```{r analysis, include=F}
 # conducting the main analysis with different values of variable listed next. This becomes the basis of pulling together summary tables and sensitivity analysis tables.
 # defining values of sensitivity, specificity, pool size, combination and dataset identifiers
-SeP_values <- c(0.98, 1) 
+SeP_values <- c(0.95, 1) 
 SeI_values <- c(1) 
-SpP_values <- c(0.95, 1)
+SpP_values <- c(0.98, 1)
 SpI_values <- c(1)
 poolsize_values <- c("pool3", "pool4") 
 combination_values <- colnames(combination %>% clean_names() %>% select(-c(1:3)))
@@ -238,6 +238,13 @@ sensitivity_summary <- output_summary %>%
               names_from = SpP_value,
               values_from = total_tests,
               names_prefix = "") %>% 
+  left_join(.,output_summary %>% filter(sensitivity_case == "SeP_1_SpP_1") %>% 
+            select(identifier,country,platform,poolsize,combination,total_tests), 
+            join_by(identifier,country,platform,poolsize,combination)) %>% 
+ mutate(across(starts_with("Pooling specificity:"), 
+                ~round(((total_tests - .) / total_tests), 4),
+                .names = "Savings in {str_replace(.col, 'Pooling ', '')}")) %>% 
+  # formatting for table
   filter(combination != "combination_4") %>% 
   mutate(combination = case_when(combination == "cxr_case"                ~ "CXR Case",
                                  combination == "general_pooling_case"    ~ "General Pooling Case",
@@ -252,7 +259,8 @@ sensitivity_summary <- output_summary %>%
          `Platform` = platform,
          `Pool size` = poolsize,
          `Pooling case` = combination,
-         `Pooling sensitivity` = SeP) 
+         `Pooling sensitivity` = SeP,
+         `Comparator (Pooling sensititivity & specificity: 1)` = total_tests) 
 
 sensitivity_unique_identifiers <- unique(sensitivity_summary$Identifier)
 
@@ -265,7 +273,7 @@ for (id in sensitivity_unique_identifiers) {
     arrange(`Pool size`)
     sensitivity_dfs[[id]] <- df
 }
-
+  
 write_xlsx(sensitivity_dfs, here("Output", "Xpert_pooling_sensitivity_summary.xlsx"))
 ```
 
