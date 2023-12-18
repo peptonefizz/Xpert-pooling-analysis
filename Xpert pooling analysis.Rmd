@@ -322,6 +322,57 @@ results_by_identifier$legend <- legend
 export(results_by_identifier, here("Output", "Xpert_pooling_overall_summary.xlsx"))
 ```
 
+```{r figure main results, include=F}
+figure_result <- output_summary %>% 
+  filter(combination != "combination_4",
+         poolsize == "pool4",
+         sensitivity_case == "SeP_1_SpP_1") %>% 
+  bind_rows(.,
+            base_case %>%
+              left_join(.,legend,join_by("identifier")) %>% 
+              select(-c(year,notes)) %>% 
+              mutate(combination = "base_case") %>% 
+              rename(total_tests = tests_performed)
+  ) %>% 
+  mutate(
+    country_platform = paste(country, platform, sep = "-"),
+    combination = factor(case_when(
+      combination == "base_case"               ~ "Base Case",
+      combination == "cxr_case"                ~ "CXR Case",
+      combination == "general_pooling_case"    ~ "General Pooling Case",
+      combination == "mixed_pooling_case"      ~ "AI-guided Pooling Case",
+      combination == "cad_cohort_pooling_case" ~ "AI-guided CAD Cohort Pooling Case"), 
+      levels = c("Base Case", "CXR Case", "General Pooling Case", "AI-guided Pooling Case", "AI-guided CAD Cohort Pooling Case"))
+  ) %>% 
+  select(identifier,country_platform,combination,total_tests,missed_cases) %>% 
+  filter(combination != "AI-guided CAD Cohort Pooling Case") %>% 
+  filter(country_platform != "Bangladesh-CAD4TB6") %>% 
+  group_by(country_platform) %>%
+  mutate(
+    base_total_tests = total_tests[combination == "Base Case"],
+    percentage = total_tests / base_total_tests * 100
+  ) %>%
+  ungroup()
+
+ggplot(figure_result, aes(x = country_platform, y = total_tests, fill = combination)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  geom_text(aes(label = paste0(round(percentage, 0), "%")), #Percentages indicate tests relative to the Base Case
+            position = position_dodge(width = 0.9), 
+            vjust = -0.6, size = 2.9, alpha = 0.8) +
+  scale_fill_manual(values = MetBrewer::met.brewer("Egypt", n = 4)) +
+  # scale_fill_manual(values = MetBrewer::met.brewer("Johnson", n = 5))+ # when using all cases
+  scale_y_continuous(labels = label_number(big.mark = ",")) +
+  labs(y = "Total Tests") +
+  theme_minimal(base_family = "Helvetica") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 8.5, face = "bold"),
+    axis.title.x = element_blank()
+  )
+```
+
+
 ```{r sensitivity analysis tables, include=F}
 # putting together sensitivity analysis tables for the paper
 sensitivity_summary <- output_summary %>%
