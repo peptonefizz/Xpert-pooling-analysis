@@ -94,10 +94,10 @@ tableinput_combination <- master %>%
     `Cut-off Score` = cut_off_score,
     `CXR Case` = cxr_case,
     `General Pooling Case` = general_pooling_case,
-    `Mixed Pooling Case` = mixed_pooling_case,
-    `CAD Cohort Pooling Case` = cad_cohort_pooling_case
+    `AI-guided Pooling Case` = mixed_pooling_case,
+    `AI-guided CAD Cohort Pooling Case` = cad_cohort_pooling_case
   ) %>% 
-  mutate(across(`CXR Case`:`CAD Cohort Pooling Case`, ~case_when(
+  mutate(across(`CXR Case`:`AI-guided CAD Cohort Pooling Case`, ~case_when(
     . == 0  ~ "No",
     . == 1  ~ "Individual",
     . == 11 ~ "Pool 1",
@@ -291,7 +291,7 @@ base_case <- aggregate(tests_performed ~ identifier, data = master, FUN = sum)
 
 # template data frame for the results
 results_template <- data.frame(
-  Use_Case = c("Base case", "CXR case", "General pooling case", "Mixed pooling case", "CAD cohort pooling case"),
+  Use_Case = c("Base case", "CXR case", "General pooling case", "AI-guided pooling case", "AI-guided CAD cohort pooling case"),
   Total_Tests_Done = NA,
   Tests_saved_from_prior_case = NA,
   Percentage_test_saved_from_prior_case = NA,
@@ -340,8 +340,8 @@ sensitivity_summary <- output_summary %>%
   filter(combination != "combination_4") %>% 
   mutate(combination = case_when(combination == "cxr_case"                ~ "CXR Case",
                                  combination == "general_pooling_case"    ~ "General Pooling Case",
-                                 combination == "mixed_pooling_case"      ~ "Mixed Pooling Case",
-                                 combination == "cad_cohort_pooling_case" ~ "CAD Cohort Pooling Case")
+                                 combination == "mixed_pooling_case"      ~ "AI-guided Pooling Case",
+                                 combination == "cad_cohort_pooling_case" ~ "AI-guided CAD Cohort Pooling Case")
   ) %>% 
   mutate(poolsize = case_when(poolsize == "pool3" ~ "Pools of 3",
                               poolsize == "pool4" ~ "Pools of 4")
