@@ -8,7 +8,7 @@ date: "`r Sys.Date()`"
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(echo=F,message=F, warning=F)
 suppressMessages(if (!require("pacman")) install.packages("pacman"))
-pacman::p_load(tidyverse,rio,writexl,janitor,here,rbibutils,binGroup2,sessioninfo)
+pacman::p_load(tidyverse,rio,writexl,janitor,here,scales,MetBrewer,rbibutils,binGroup2,sessioninfo)
 ```
 
 
@@ -112,6 +112,93 @@ export(list(qXR_data = tableinput_data_qxr, CAD4TB_data = tableinput_data_cad4tb
             qXR_threshold = tableinput_threshold_qxr, CAD4TB_threshold = tableinput_threshold_cad4tb,
             combination = tableinput_combination),
        here("Output", "Xpert_pooling_input_tables.xlsx"))
+
+########### Visualization: testing data ###########
+tableinput_viz <- tableinput_data %>% 
+  group_by(country_platform) %>% 
+  summarise(tests_performed = sum(tests_performed),
+            test_positive = sum(test_positive)) %>% 
+  pivot_longer(cols = starts_with("test"), names_to = "test_type", values_to = "count") %>%
+  mutate(test_type = factor(test_type, levels = c("tests_performed", "test_positive"))) %>% 
+  filter(country_platform != "Bangladesh-CAD4TB6") %>% 
+  separate(country_platform, into = c("country", "platform"), sep = "-")
+
+tableinput_viz_summary <- tableinput_data %>% 
+  group_by(country_platform) %>% 
+  reframe(tests_performed = sum(tests_performed),
+          test_positive = sum(test_positive),
+          proportion_positive = test_positive / tests_performed * 100) %>% 
+  filter(country_platform != "Bangladesh-CAD4TB6") %>% 
+  separate(country_platform, into = c("country", "platform"), sep = "-") %>% 
+  select(country,proportion_positive)
+  
+
+ggplot(tableinput_viz) +
+  geom_bar(aes(x = country, y = count, fill = test_type), stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = MetBrewer::met.brewer("Gauguin", n = 2),
+                    labels = c("Tests Performed", "Test Positive")) +
+  geom_point(data = tableinput_viz_summary, aes(x = country, y = 25000), color = "#164778", size = 3) +
+  geom_text(data = tableinput_viz_summary, aes(x = country, y = 25000, label = paste0(format(round(proportion_positive, 1), nsmall = 1), "%")), 
+            vjust = 0.5, hjust = -0.2, color = "#062640", size = 3.5) +
+  labs(x = element_blank(), y = "Number of Tests", fill = "Test Type") +
+  scale_y_continuous(labels = scales::label_number(big.mark = ",")) +
+  theme_minimal(base_family = "Helvetica") +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        axis.text.x = element_text(size = 12),
+        axis.title.x = element_blank())
+
+########### Visualization: distribution across CAD bands ###########
+# Creating a mapping of cut_off_score to decile names because qXR and CAD4TB score are reported differently
+decile_map <- c("0–0.09" = "D1", "0.10–0.19" = "D2", "0.20–0.29" = "D3", "0.30–0.39" = "D4",
+                "0.40–0.49" = "D5", "0.50–0.59" = "D6", "0.60–0.69" = "D7", "0.70–0.79" = "D8",
+                "0.80–0.89" = "D9", "0.90–0.99" = "D10", 
+                "0-9" = "D1", "10-19" = "D2",
+                "20-29" = "D3", "30-39" = "D4", "40-49" = "D5", "50-59" = "D6",
+                "60-69" = "D7", "70-79" = "D8", "80-89" = "D9", "90-99" = "D10")
+
+tableinput_cad_viz <- tableinput_data %>% 
+  mutate(proportion_positive = test_positive / tests_performed * 100) %>% 
+  group_by(country_platform) %>%
+  mutate(total_tests_performed = sum(tests_performed)) %>% # Total tests per country_platform
+  ungroup() %>%
+  mutate(proportion_test_cadband = tests_performed / total_tests_performed * 100) %>% 
+  select(-c(total_tests_performed,tests_performed,test_positive)) %>% 
+  mutate(cut_off_score_decile = as_factor(decile_map[cut_off_score]))
+
+
+# Create a long format of the data for plotting
+long_data <- tableinput_cad_viz %>%
+  pivot_longer(cols = c("proportion_test_cadband", "proportion_positive"), 
+               names_to = "measure", 
+               values_to = "value") %>% 
+   mutate(measure = factor(measure, 
+                          levels = c("proportion_test_cadband", "proportion_positive"),
+                          labels = c("Testing distribution by AI-score decile", "Test positivity by AI-score decile"))) %>% 
+  filter(country_platform != "Bangladesh-CAD4TB6") 
+
+
+testing_colors <- MetBrewer::met.brewer("Egypt", n = 4)
+
+ggplot(long_data, aes(x = cut_off_score_decile, y = value, color = country_platform, group = interaction(country_platform, measure))) +
+  geom_point() + 
+  geom_line() +   # Connect points with lines
+  facet_wrap(~measure, scales = "free_y", nrow=2) +  
+  scale_color_manual(values = testing_colors) + 
+  scale_y_continuous(limits = c(0, 80), labels = percent_format(scale = 1)) +  # Format y-axis as percent and set limits
+  labs(y = "Value (%)", x = "Cut-off Score", color = "Country Platform") +
+  theme_minimal(base_family = "Helvetica") +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        strip.text = element_text(size = 9, face = "bold"))
+
+# "The figure's decile labels (D1 to D10) represent grouped CAD cut-off score ranges: D1-D10 for 0-0.99 in 0.1 intervals for qXR score and D1-D10 for 0-99 in 10-point intervals for CAD4TB score."
+
+# "Testing distribution by AI-score decile" refers to the percentage of total tests performed within each AI-score decile. "Test positivity by AI-score decile" shows the proportion of positive results in each AI-score decile.
+
 ```
 
 
@@ -207,7 +294,9 @@ results_template <- data.frame(
   Use_Case = c("Base case", "CXR case", "General pooling case", "Mixed pooling case", "CAD cohort pooling case"),
   Total_Tests_Done = NA,
   Tests_saved_from_prior_case = NA,
-  Percentage_test_saved_from_prior_case = NA
+  Percentage_test_saved_from_prior_case = NA,
+  Tests_saved_from_base_case = NA,
+  Percentage_test_saved_from_base_case = NA
 )
 results_by_identifier <- list()
 
@@ -218,9 +307,13 @@ for (id in unique(output_summary$identifier)) {
   results$Total_Tests_Done[results$Use_Case == "Base case"] <- base_case$tests_performed[base_case$identifier == id]
   results$Total_Tests_Done[-1] <- summary_subset$total_tests
   
+  base_tests_done <- results$Total_Tests_Done[results$Use_Case == "Base case"]
+  
   for (i in 2:nrow(results)) {
     results$Tests_saved_from_prior_case[i] <- results$Total_Tests_Done[i-1] - results$Total_Tests_Done[i]
     results$Percentage_test_saved_from_prior_case[i] <- (results$Tests_saved_from_prior_case[i] / results$Total_Tests_Done[i-1])
+    results$Tests_saved_from_base_case[i] <- base_tests_done - results$Total_Tests_Done[i]
+    results$Percentage_test_saved_from_base_case[i] <- (results$Tests_saved_from_base_case[i] / base_tests_done)
   }
   
   results_by_identifier[[id]] <- results
@@ -228,7 +321,6 @@ for (id in unique(output_summary$identifier)) {
 results_by_identifier$legend <- legend
 export(results_by_identifier, here("Output", "Xpert_pooling_overall_summary.xlsx"))
 ```
-
 
 ```{r sensitivity analysis tables, include=F}
 # putting together sensitivity analysis tables for the paper
