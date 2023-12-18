@@ -117,36 +117,34 @@ export(list(qXR_data = tableinput_data_qxr, CAD4TB_data = tableinput_data_cad4tb
 tableinput_viz <- tableinput_data %>% 
   group_by(country_platform) %>% 
   summarise(tests_performed = sum(tests_performed),
-            test_positive = sum(test_positive)) %>% 
+            test_positive = sum(test_positive),
+            positivity = test_positive / tests_performed * 100) %>% 
   pivot_longer(cols = starts_with("test"), names_to = "test_type", values_to = "count") %>%
   mutate(test_type = factor(test_type, levels = c("tests_performed", "test_positive"))) %>% 
   filter(country_platform != "Bangladesh-CAD4TB6") %>% 
-  separate(country_platform, into = c("country", "platform"), sep = "-")
-
-tableinput_viz_summary <- tableinput_data %>% 
-  group_by(country_platform) %>% 
-  reframe(tests_performed = sum(tests_performed),
-          test_positive = sum(test_positive),
-          proportion_positive = test_positive / tests_performed * 100) %>% 
-  filter(country_platform != "Bangladesh-CAD4TB6") %>% 
   separate(country_platform, into = c("country", "platform"), sep = "-") %>% 
-  select(country,proportion_positive)
-  
+  mutate(positivity = case_when(test_type == "tests_performed" ~ 100,
+                                TRUE ~ positivity))
 
-ggplot(tableinput_viz) +
-  geom_bar(aes(x = country, y = count, fill = test_type), stat = "identity", position = position_dodge()) +
+ggplot(tableinput_viz, aes(x = country, y = count, fill = test_type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  geom_text(aes(label = paste0(round(positivity, 0), "%")),
+            position = position_dodge(width = 0.9), 
+            vjust = -0.6, size = 3, alpha = 0.8) +
   scale_fill_manual(values = MetBrewer::met.brewer("Gauguin", n = 2),
                     labels = c("Tests Performed", "Test Positive")) +
-  geom_point(data = tableinput_viz_summary, aes(x = country, y = 25000), color = "#164778", size = 3) +
-  geom_text(data = tableinput_viz_summary, aes(x = country, y = 25000, label = paste0(format(round(proportion_positive, 1), nsmall = 1), "%")), 
-            vjust = 0.5, hjust = -0.2, color = "#062640", size = 3.5) +
   labs(x = element_blank(), y = "Number of Tests", fill = "Test Type") +
-  scale_y_continuous(labels = scales::label_number(big.mark = ",")) +
+  scale_y_continuous(labels = label_number(big.mark = ",")) +
   theme_minimal(base_family = "Helvetica") +
-  theme(legend.position = "bottom",
-        legend.title = element_blank(),
-        axis.text.x = element_text(size = 12),
-        axis.title.x = element_blank())
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.title.x = element_blank()
+  )
+
+ggsave(here("Output","figure_test.pdf"),width = 20, height = 10, units = "cm")
+# ggsave(here("Output","figure_test.eps"), width = 20, height = 10, dpi = 150, limitsize = TRUE)
 
 ########### Visualization: distribution across CAD bands ###########
 # Creating a mapping of cut_off_score to decile names because qXR and CAD4TB score are reported differently
@@ -194,6 +192,8 @@ ggplot(long_data, aes(x = cut_off_score_decile, y = value, color = country_platf
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         strip.text = element_text(size = 9, face = "bold"))
+
+ggsave(here("Output","figure_test_distribution.pdf"),width = 20, height = 15, units = "cm")
 
 # "The figure's decile labels (D1 to D10) represent grouped CAD cut-off score ranges: D1-D10 for 0-0.99 in 0.1 intervals for qXR score and D1-D10 for 0-99 in 10-point intervals for CAD4TB score."
 
@@ -370,6 +370,8 @@ ggplot(figure_result, aes(x = country_platform, y = total_tests, fill = combinat
     axis.text.x = element_text(size = 8.5, face = "bold"),
     axis.title.x = element_blank()
   )
+
+ggsave(here("Output","figure_result_main.png"),width = 20, height = 15, units = "cm")
 ```
 
 
