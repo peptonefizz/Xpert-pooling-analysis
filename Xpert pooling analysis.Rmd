@@ -130,7 +130,7 @@ ggplot(tableinput_viz, aes(x = country, y = count, fill = test_type)) +
   geom_bar(stat = "identity", position = position_dodge()) +
   geom_text(aes(label = paste0(round(positivity, 0), "%")),
             position = position_dodge(width = 0.9), 
-            vjust = -0.6, size = 3, alpha = 0.8) +
+            vjust = -0.6, size = 2.5, alpha = 0.8) +
   scale_fill_manual(values = MetBrewer::met.brewer("Gauguin", n = 2),
                     labels = c("Tests Performed", "Test Positive")) +
   labs(x = element_blank(), y = "Number of Tests", fill = "Test Type") +
@@ -139,11 +139,14 @@ ggplot(tableinput_viz, aes(x = country, y = count, fill = test_type)) +
   theme(
     legend.position = "bottom",
     legend.title = element_blank(),
-    axis.text.x = element_text(size = 12),
-    axis.title.x = element_blank()
+    legend.text = element_text(size = 8),
+    axis.text.x = element_text(size = 9),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 9),
+    axis.text.y = element_text(size = 7),
   )
 
-ggsave(here("Output","figure_test.pdf"),width = 20, height = 10, units = "cm")
+ggsave(here("Output","figure_test.pdf"),width = 10, height = 10, units = "cm")
 # ggsave(here("Output","figure_test.eps"), width = 20, height = 10, dpi = 150, limitsize = TRUE)
 
 ########### Visualization: distribution across CAD bands ###########
@@ -172,7 +175,7 @@ long_data <- tableinput_cad_viz %>%
                values_to = "value") %>% 
    mutate(measure = factor(measure, 
                           levels = c("proportion_test_cadband", "proportion_positive"),
-                          labels = c("Testing distribution by AI-score decile", "Test positivity by AI-score decile"))) %>% 
+                          labels = c("A. Testing distribution by AI-score decile", "B. Test positivity by AI-score decile"))) %>% 
   filter(country_platform != "Bangladesh-CAD4TB6") 
 
 
@@ -193,7 +196,7 @@ ggplot(long_data, aes(x = cut_off_score_decile, y = value, color = country_platf
         axis.title.y = element_blank(),
         strip.text = element_text(size = 9, face = "bold"))
 
-ggsave(here("Output","figure_test_distribution.pdf"),width = 20, height = 15, units = "cm")
+ggsave(here("Output","figure_test_distribution.pdf"),width = 15, height = 15, units = "cm")
 
 # "The figure's decile labels (D1 to D10) represent grouped CAD cut-off score ranges: D1-D10 for 0-0.99 in 0.1 intervals for qXR score and D1-D10 for 0-99 in 10-point intervals for CAD4TB score."
 
