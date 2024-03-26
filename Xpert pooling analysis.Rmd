@@ -147,7 +147,7 @@ ggplot(tableinput_viz, aes(x = country, y = count, fill = test_type)) +
   )
 
 ggsave(here("Output","figure2_test.png"),width = 10, height = 10, units = "cm",dpi = 300)
-ggsave(here("Output","figure2_test.pdf"),width = 10, height = 10, units = "cm",dpi = 300)
+ggsave(here("Output","figure2_test.eps"),width = 10, height = 10, units = "cm",dpi = 300)
 
 ########### Visualization: distribution across CAD bands ###########
 # Creating a mapping of cut_off_score to decile names because qXR and CAD4TB score are reported differently
@@ -197,7 +197,7 @@ ggplot(long_data, aes(x = cut_off_score_decile, y = value, color = country_platf
         strip.text = element_text(size = 9, face = "bold"))
 
 ggsave(here("Output","figure3_test_distribution.png"),width = 15, height = 15, units = "cm", dpi = 300)
-ggsave(here("Output","figure3_test_distribution.pdf"),width = 15, height = 15, units = "cm", dpi = 300)
+ggsave(here("Output","figure3_test_distribution.eps"),width = 15, height = 15, units = "cm", dpi = 300)
 
 # "The figure's decile labels (D1 to D10) represent grouped CAD cut-off score ranges: D1-D10 for 0-0.99 in 0.1 intervals for qXR score and D1-D10 for 0-99 in 10-point intervals for CAD4TB score."
 
@@ -376,7 +376,7 @@ ggplot(figure_result, aes(x = country_platform, y = total_tests, fill = combinat
   )
 
 ggsave(here("Output","figure4_result_model.png"),width = 20, height = 15, units = "cm", dpi = 300)
-ggsave(here("Output","figure4_result_model.pdf"),width = 20, height = 15, units = "cm", dpi = 300)
+ggsave(here("Output","figure4_result_model.eps"),width = 20, height = 15, units = "cm", dpi = 300)
 ```
 
 
