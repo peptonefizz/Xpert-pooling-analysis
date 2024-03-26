@@ -146,8 +146,8 @@ ggplot(tableinput_viz, aes(x = country, y = count, fill = test_type)) +
     axis.text.y = element_text(size = 7),
   )
 
-ggsave(here("Output","figure_test.pdf"),width = 10, height = 10, units = "cm")
-# ggsave(here("Output","figure_test.eps"), width = 20, height = 10, dpi = 150, limitsize = TRUE)
+ggsave(here("Output","figure2_test.png"),width = 10, height = 10, units = "cm",dpi = 300)
+ggsave(here("Output","figure2_test.pdf"),width = 10, height = 10, units = "cm",dpi = 300)
 
 ########### Visualization: distribution across CAD bands ###########
 # Creating a mapping of cut_off_score to decile names because qXR and CAD4TB score are reported differently
@@ -196,7 +196,8 @@ ggplot(long_data, aes(x = cut_off_score_decile, y = value, color = country_platf
         axis.title.y = element_blank(),
         strip.text = element_text(size = 9, face = "bold"))
 
-ggsave(here("Output","figure_test_distribution.pdf"),width = 15, height = 15, units = "cm")
+ggsave(here("Output","figure3_test_distribution.png"),width = 15, height = 15, units = "cm", dpi = 300)
+ggsave(here("Output","figure3_test_distribution.pdf"),width = 15, height = 15, units = "cm", dpi = 300)
 
 # "The figure's decile labels (D1 to D10) represent grouped CAD cut-off score ranges: D1-D10 for 0-0.99 in 0.1 intervals for qXR score and D1-D10 for 0-99 in 10-point intervals for CAD4TB score."
 
@@ -289,12 +290,12 @@ output_summary %>% export(here("Output","Xpert_pooling_output.xlsx"))
 
 
 ```{r summary output table, include=F}
-# calculate the 'Base case'
+# calculate the 'Baseline case'
 base_case <- aggregate(tests_performed ~ identifier, data = master, FUN = sum)
 
 # template data frame for the results
 results_template <- data.frame(
-  Use_Case = c("Base case", "CXR case", "General pooling case", "AI-guided pooling case", "AI-guided CAD cohort pooling case"),
+  Use_Case = c("Baseline case", "CXR case", "General pooling case", "AI-guided pooling case", "AI-guided CAD cohort pooling case"),
   Total_Tests_Done = NA,
   Tests_saved_from_prior_case = NA,
   Percentage_test_saved_from_prior_case = NA,
@@ -307,10 +308,10 @@ results_by_identifier <- list()
 for (id in unique(output_summary$identifier)) {
   summary_subset <- output_summary[output_summary$identifier == id & output_summary$sensitivity_case == "SeP_1_SpP_1" & output_summary$poolsize == "pool4", ]
   results <- results_template
-  results$Total_Tests_Done[results$Use_Case == "Base case"] <- base_case$tests_performed[base_case$identifier == id]
+  results$Total_Tests_Done[results$Use_Case == "Baseline case"] <- base_case$tests_performed[base_case$identifier == id]
   results$Total_Tests_Done[-1] <- summary_subset$total_tests
   
-  base_tests_done <- results$Total_Tests_Done[results$Use_Case == "Base case"]
+  base_tests_done <- results$Total_Tests_Done[results$Use_Case == "Baseline case"]
   
   for (i in 2:nrow(results)) {
     results$Tests_saved_from_prior_case[i] <- results$Total_Tests_Done[i-1] - results$Total_Tests_Done[i]
@@ -340,19 +341,19 @@ figure_result <- output_summary %>%
   mutate(
     country_platform = paste(country, platform, sep = "-"),
     combination = factor(case_when(
-      combination == "base_case"               ~ "Base Case",
+      combination == "base_case"               ~ "Baseline Case",
       combination == "cxr_case"                ~ "CXR Case",
       combination == "general_pooling_case"    ~ "General Pooling Case",
       combination == "mixed_pooling_case"      ~ "AI-guided Pooling Case",
       combination == "cad_cohort_pooling_case" ~ "AI-guided CAD Cohort Pooling Case"), 
-      levels = c("Base Case", "CXR Case", "General Pooling Case", "AI-guided Pooling Case", "AI-guided CAD Cohort Pooling Case"))
+      levels = c("Baseline Case", "CXR Case", "General Pooling Case", "AI-guided Pooling Case", "AI-guided CAD Cohort Pooling Case"))
   ) %>% 
   select(identifier,country_platform,combination,total_tests,missed_cases) %>% 
   filter(combination != "AI-guided CAD Cohort Pooling Case") %>% 
   filter(country_platform != "Bangladesh-CAD4TB6") %>% 
   group_by(country_platform) %>%
   mutate(
-    base_total_tests = total_tests[combination == "Base Case"],
+    base_total_tests = total_tests[combination == "Baseline Case"],
     percentage = total_tests / base_total_tests * 100
   ) %>%
   ungroup()
@@ -374,7 +375,8 @@ ggplot(figure_result, aes(x = country_platform, y = total_tests, fill = combinat
     axis.title.x = element_blank()
   )
 
-ggsave(here("Output","figure_result_main.png"),width = 20, height = 15, units = "cm")
+ggsave(here("Output","figure4_result_model.png"),width = 20, height = 15, units = "cm", dpi = 300)
+ggsave(here("Output","figure4_result_model.pdf"),width = 20, height = 15, units = "cm", dpi = 300)
 ```
 
 
