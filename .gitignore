@@ -19,10 +19,11 @@ Archive
 !**/*.Rproj
 
 # Excel data files
-**/*.xlsx
+!**/*.xlsx
+!Xpert pooling Demo_v4Github
 
 # session info
-Session\ info/*.txt
+!Session\ info/*.txt
 
 Xpert pooling analysis_text.Rmd
 .Rproj.user
