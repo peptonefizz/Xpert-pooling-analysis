@@ -256,7 +256,7 @@ summarizeAndCalculate <- function(df, poolsize, combination, SeP, SeI, SpP, SpI)
 ```{r analysis, include=F}
 # conducting the main analysis with different values of variable listed next. This becomes the basis of pulling together summary tables and sensitivity analysis tables.
 # defining values of sensitivity, specificity, pool size, combination and dataset identifiers
-SeP_values <- c(0.95, 1) 
+SeP_values <- c(0.90, 0.95, 1) 
 SeI_values <- c(1) 
 SpP_values <- c(0.98, 1)
 SpI_values <- c(1)
