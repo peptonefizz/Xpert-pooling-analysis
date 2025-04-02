@@ -1,5 +1,3 @@
-# Expanding molecular diagnostic coverage for tuberculosis by combining computer-aided chest radiography and sputum specimen pooling: a modeling study from four high-burden countries
-
 This repository contains the R code and data used in the analysis for the published study:
 
 **Expanding molecular diagnostic coverage for tuberculosis by combining computer-aided chest radiography and sputum specimen pooling: a modeling study from four high-burden countries**  
@@ -29,10 +27,10 @@ Xpert-pooling-analysis/
 
 ## 🚀 How to Run
 
-1. **Clone the repository in R Studio**
+1. Clone the repository.
 
 2. Load the R project using `Xpert pooling analysis.Rproj`.
 
-3. **Run or Knit** the R Markdown file to generate outputs and figures.
+3. Run the R Markdown file to generate outputs and figures.
 
 ---
